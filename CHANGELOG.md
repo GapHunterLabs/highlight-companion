@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [0.1.1]
+
+### Added
+
+- Gap Hunter Labs brand icon (`pluginIcon.svg` / `pluginIcon_dark.svg`).
+
 ## [0.1.0]
 
 ### Added
@@ -29,3 +35,7 @@
 - Configurable green/yellow/red thresholds and a minimum-complexity
   cutoff before an icon is shown at all.
 - No telemetry, no license prompts, no network access.
+
+[Unreleased]: https://github.com/kendjm/highlight-companion/compare/0.1.1...HEAD
+[0.1.1]: https://github.com/kendjm/highlight-companion/compare/0.1.0...0.1.1
+[0.1.0]: https://github.com/kendjm/highlight-companion/commits/0.1.0
