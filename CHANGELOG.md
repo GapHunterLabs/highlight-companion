@@ -36,6 +36,6 @@
   cutoff before an icon is shown at all.
 - No telemetry, no license prompts, no network access.
 
-[Unreleased]: https://github.com/kendjm/highlight-companion/compare/0.1.1...HEAD
-[0.1.1]: https://github.com/kendjm/highlight-companion/compare/0.1.0...0.1.1
-[0.1.0]: https://github.com/kendjm/highlight-companion/commits/0.1.0
+[Unreleased]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.1...HEAD
+[0.1.1]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.0...0.1.1
+[0.1.0]: https://github.com/GapHunterLabs/highlight-companion/commits/0.1.0
