@@ -97,6 +97,11 @@ badge with its cognitive complexity number. Hover for the exact thresholds;
 open Settings > Tools > Highlight Companion to toggle any rule or change
 the green/yellow/red cutoffs.
 
+## Enterprise / Team Licensing
+
+Need enterprise features, custom complexity rules, or team licensing?
+Contact us at **kennyj.diazm@gmail.com**.
+
 ## Development
 
 ```
