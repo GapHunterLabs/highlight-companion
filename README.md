@@ -82,13 +82,21 @@ of constructs this plugin recognizes:
   against the enclosing function (no full resolve, by design — see the
   walkers' own doc comments for the tradeoff).
 
-Known v0.1 limitation: a control-flow expression buried inside a larger
-expression (e.g. an `if` passed as a function argument, or one inside a
-lambda body) isn't scored structurally — only direct positions (statements,
-return values, branch bodies, property initializers) are. Nested
-functions/lambdas adding their own ambient nesting level (a real rule in
-the whitepaper) isn't modeled either. Both are documented gaps, not silent
-ones.
+A control-flow expression buried inside a larger expression (an `if`
+passed as a function argument, or one inside a lambda body) is scored
+structurally, not just statements/return values/branch bodies/property
+initializers — `foo(if (x > 0) a() else b())` and
+`items.forEach { if (it > 0) flag() }` both count the inner `if`. A
+buried construct never bleeds across a nested named function or
+class/object boundary, though: a local function's or an anonymous
+object's own body is scored on its own, never folded into the
+enclosing function's number.
+
+Known v0.1 limitation, still open: nested functions/lambdas adding
+their own ambient nesting level to the *code inside them* (a real rule
+in the whitepaper) isn't modeled — a buried construct is scored as if
+it were a direct statement, without extra nesting credit for being
+inside a lambda. Documented gap, not a silent one.
 
 ## Usage
 

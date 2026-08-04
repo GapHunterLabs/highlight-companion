@@ -4,6 +4,7 @@ import com.intellij.psi.JavaRecursiveElementWalkingVisitor
 import com.intellij.psi.JavaTokenType
 import com.intellij.psi.PsiBlockStatement
 import com.intellij.psi.PsiBreakStatement
+import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiContinueStatement
 import com.intellij.psi.PsiDeclarationStatement
 import com.intellij.psi.PsiDoWhileStatement
@@ -41,6 +42,13 @@ import dev.gaphunter.highlightcompanion.complexity.LogicalOp
  * through an interface/super reference with a different apparent name.
  * Documented tradeoff, not an oversight - resolving every call would defeat
  * the point of keeping this walk cheap enough to run on every edit.
+ *
+ * Buried control-flow reachable through a lambda body (Java's `if` is a
+ * statement, so the only way one ends up "inside an expression" is via
+ * a lambda) is scored structurally via [scanExpression], not silently
+ * dropped -- see its doc comment for the nested-method/class boundary
+ * that keeps an anonymous class's own body from bleeding into the
+ * enclosing method's score.
  */
 object JavaCognitiveWalker {
 
@@ -63,18 +71,18 @@ object JavaCognitiveWalker {
 
         is PsiBlockStatement -> walkStatements(statement.codeBlock.statements.toList(), methodName)
 
-        is PsiIfStatement -> recursiveCallsIn(statement.condition, methodName) + walkIf(statement, methodName)
+        is PsiIfStatement -> scanExpression(statement.condition, methodName) + walkIf(statement, methodName)
 
-        is PsiWhileStatement -> recursiveCallsIn(statement.condition, methodName) +
+        is PsiWhileStatement -> scanExpression(statement.condition, methodName) +
             ControlNode.Loop(extractBoolExpr(statement.condition), walkBody(statement.body, methodName))
 
-        is PsiDoWhileStatement -> recursiveCallsIn(statement.condition, methodName) +
+        is PsiDoWhileStatement -> scanExpression(statement.condition, methodName) +
             ControlNode.Loop(extractBoolExpr(statement.condition), walkBody(statement.body, methodName))
 
-        is PsiForStatement -> recursiveCallsIn(statement.condition, methodName) +
+        is PsiForStatement -> scanExpression(statement.condition, methodName) +
             ControlNode.Loop(extractBoolExpr(statement.condition), walkBody(statement.body, methodName))
 
-        is PsiForeachStatement -> recursiveCallsIn(statement.iteratedValue, methodName) +
+        is PsiForeachStatement -> scanExpression(statement.iteratedValue, methodName) +
             ControlNode.Loop(null, walkBody(statement.body, methodName))
 
         is PsiSwitchStatement -> walkSwitch(statement, methodName)
@@ -87,16 +95,16 @@ object JavaCognitiveWalker {
 
         is PsiContinueStatement -> if (statement.labelIdentifier != null) listOf(ControlNode.LabeledJump(true)) else emptyList()
 
-        is PsiExpressionStatement -> recursiveCallsIn(statement.expression, methodName)
+        is PsiExpressionStatement -> scanExpression(statement.expression, methodName)
 
-        is PsiReturnStatement -> recursiveCallsIn(statement.returnValue, methodName)
+        is PsiReturnStatement -> scanExpression(statement.returnValue, methodName)
 
-        is PsiThrowStatement -> recursiveCallsIn(statement.exception, methodName)
+        is PsiThrowStatement -> scanExpression(statement.exception, methodName)
 
-        is PsiYieldStatement -> recursiveCallsIn(statement.expression, methodName)
+        is PsiYieldStatement -> scanExpression(statement.expression, methodName)
 
         is PsiDeclarationStatement -> statement.declaredElements.filterIsInstance<PsiLocalVariable>()
-            .flatMap { recursiveCallsIn(it.initializer, methodName) }
+            .flatMap { scanExpression(it.initializer, methodName) }
 
         else -> emptyList()
     }
@@ -113,7 +121,7 @@ object JavaCognitiveWalker {
     }
 
     private fun walkSwitch(statement: PsiSwitchStatement, methodName: String): List<ControlNode> {
-        val recursionInSelector = recursiveCallsIn(statement.expression, methodName)
+        val recursionInSelector = scanExpression(statement.expression, methodName)
         val caseNodes = statement.body?.statements?.toList()?.let { walkStatements(it, methodName) } ?: emptyList()
         return recursionInSelector + ControlNode.Switch(caseNodes)
     }
@@ -127,18 +135,66 @@ object JavaCognitiveWalker {
         return tryNodes + catchNodes + finallyNodes
     }
 
-    private fun recursiveCallsIn(expr: PsiExpression?, methodName: String): List<ControlNode.RecursiveCall> {
+    /**
+     * Scans an arbitrary expression subtree for two things at once:
+     * recursive calls to the enclosing method, and any buried
+     * if/while/do-while/for/foreach/switch/try statement reachable
+     * through a lambda body -- Java's `if` is a statement, not an
+     * expression, so the only way one can be "buried inside an
+     * expression" is via a lambda (`list.forEach(x -> { if (x > 0)
+     * ... } })`); that inner if is scored structurally instead of being
+     * invisible to the calculator. Stops descending at a nested method
+     * or class declaration (an anonymous/local class's own method), so
+     * its body is never folded into the enclosing method's score.
+     */
+    private fun scanExpression(expr: PsiExpression?, methodName: String): List<ControlNode> {
         if (expr == null) return emptyList()
-        val calls = mutableListOf<ControlNode.RecursiveCall>()
+        val nodes = mutableListOf<ControlNode>()
         expr.accept(object : JavaRecursiveElementWalkingVisitor() {
             override fun visitMethodCallExpression(expression: PsiMethodCallExpression) {
                 super.visitMethodCallExpression(expression)
                 if (expression.methodExpression.referenceName == methodName) {
-                    calls.add(ControlNode.RecursiveCall(methodName))
+                    nodes.add(ControlNode.RecursiveCall(methodName))
                 }
             }
+
+            override fun visitIfStatement(statement: PsiIfStatement) {
+                nodes.addAll(walkStatement(statement, methodName))
+            }
+
+            override fun visitWhileStatement(statement: PsiWhileStatement) {
+                nodes.addAll(walkStatement(statement, methodName))
+            }
+
+            override fun visitDoWhileStatement(statement: PsiDoWhileStatement) {
+                nodes.addAll(walkStatement(statement, methodName))
+            }
+
+            override fun visitForStatement(statement: PsiForStatement) {
+                nodes.addAll(walkStatement(statement, methodName))
+            }
+
+            override fun visitForeachStatement(statement: PsiForeachStatement) {
+                nodes.addAll(walkStatement(statement, methodName))
+            }
+
+            override fun visitSwitchStatement(statement: PsiSwitchStatement) {
+                nodes.addAll(walkSwitch(statement, methodName))
+            }
+
+            override fun visitTryStatement(statement: PsiTryStatement) {
+                nodes.addAll(walkTry(statement, methodName))
+            }
+
+            override fun visitMethod(method: PsiMethod) {
+                // Boundary: a nested method's own body is scored separately, never here.
+            }
+
+            override fun visitClass(aClass: PsiClass) {
+                // Boundary: an anonymous/local class's own methods are scored separately.
+            }
         })
-        return calls
+        return nodes
     }
 
     private fun extractBoolExpr(expr: PsiExpression?): BoolExpr? {

@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+## [0.1.3]
+
+### Added
+
+- Buried control-flow constructs (an `if` passed as a function
+  argument, or one inside a lambda body) are now scored structurally
+  instead of being invisible to the calculator — `foo(if (x > 0) a()
+  else b())` and `items.forEach { if (it > 0) flag() }` both count.
+  Never bleeds across a nested named function or class/object
+  boundary: a local function's or an anonymous object's own body is
+  still scored on its own.
+
 ## [0.1.2]
 
 ### Changed
@@ -45,7 +57,8 @@
   cutoff before an icon is shown at all.
 - No telemetry, no license prompts, no network access.
 
-[Unreleased]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.2...HEAD
+[Unreleased]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.3...HEAD
+[0.1.3]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.2...0.1.3
 [0.1.2]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/GapHunterLabs/highlight-companion/commits/0.1.0

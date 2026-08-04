@@ -9,6 +9,7 @@ import org.jetbrains.kotlin.psi.KtBinaryExpression
 import org.jetbrains.kotlin.psi.KtBlockExpression
 import org.jetbrains.kotlin.psi.KtBreakExpression
 import org.jetbrains.kotlin.psi.KtCallExpression
+import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtContinueExpression
 import org.jetbrains.kotlin.psi.KtDoWhileExpression
 import org.jetbrains.kotlin.psi.KtExpression
@@ -35,12 +36,15 @@ import org.jetbrains.kotlin.psi.KtWhileExpression
  * uniformly - a `return if (x) a else b` is scored exactly like a bare
  * `if` used as a statement.
  *
- * Known, deliberate gap (matches JavaCognitiveWalker): a control-flow
- * expression buried inside a larger expression - e.g. an if passed as a
- * function argument, or one inside a lambda body - falls back to the
- * generic recursive-call scan instead of being scored structurally. Only
- * direct positions (block statements, return values, property
- * initializers, branch bodies) get full structural treatment. See README.
+ * Buried control-flow (an if/when/loop/try passed as a function
+ * argument, or one inside a lambda body) is scored structurally via
+ * [scanExpression], not silently dropped -- e.g. `foo(if (x) a else b)`
+ * and `list.forEach { if (it > 0) ... } }` both count the inner if. The
+ * scan stops at a nested named function/class/object boundary, so a
+ * local function or anonymous object's own body is never folded into
+ * the enclosing function's score (that's a *different*, still
+ * deliberately out-of-scope gap: nested functions/lambdas adding their
+ * own ambient nesting level to the score, see README).
  */
 object KotlinCognitiveWalker {
 
@@ -67,15 +71,15 @@ object KotlinCognitiveWalker {
 
             is KtBlockExpression -> walkBlockChildren(expr, methodName)
 
-            is KtIfExpression -> recursiveCallsIn(expr.condition, methodName) + walkIf(expr, methodName)
+            is KtIfExpression -> scanExpression(expr.condition, methodName) + walkIf(expr, methodName)
 
-            is KtWhileExpression -> recursiveCallsIn(expr.condition, methodName) +
+            is KtWhileExpression -> scanExpression(expr.condition, methodName) +
                 ControlNode.Loop(extractBoolExpr(expr.condition), walk(expr.body, methodName))
 
-            is KtDoWhileExpression -> recursiveCallsIn(expr.condition, methodName) +
+            is KtDoWhileExpression -> scanExpression(expr.condition, methodName) +
                 ControlNode.Loop(extractBoolExpr(expr.condition), walk(expr.body, methodName))
 
-            is KtForExpression -> recursiveCallsIn(expr.loopRange, methodName) +
+            is KtForExpression -> scanExpression(expr.loopRange, methodName) +
                 ControlNode.Loop(null, walk(expr.body, methodName))
 
             is KtWhenExpression -> walkWhen(expr, methodName)
@@ -89,8 +93,9 @@ object KotlinCognitiveWalker {
             is KtReturnExpression -> walk(expr.returnedExpression, methodName)
 
             // Generic fallback: plain calls, assignments, dot-qualified calls, throw
-            // expressions, etc. Scanned for recursive calls only, not walked structurally.
-            else -> recursiveCallsIn(expr, methodName)
+            // expressions, etc. -- scanExpression finds both recursive calls and any
+            // buried if/when/loop/try (a function argument, a lambda body) within.
+            else -> scanExpression(expr, methodName)
         }
     }
 
@@ -105,9 +110,9 @@ object KotlinCognitiveWalker {
     }
 
     private fun walkWhen(expr: KtWhenExpression, methodName: String): List<ControlNode> {
-        val recursionInSubject = recursiveCallsIn(expr.subjectExpression, methodName)
+        val subjectNodes = scanExpression(expr.subjectExpression, methodName)
         val entryNodes = expr.entries.flatMap { entry -> walk(entry.expression, methodName) }
-        return recursionInSubject + ControlNode.Switch(entryNodes)
+        return subjectNodes + ControlNode.Switch(entryNodes)
     }
 
     private fun walkTry(expr: KtTryExpression, methodName: String): List<ControlNode> {
@@ -120,19 +125,63 @@ object KotlinCognitiveWalker {
         return tryNodes + catchNodes + finallyNodes
     }
 
-    private fun recursiveCallsIn(expr: KtExpression?, methodName: String): List<ControlNode.RecursiveCall> {
+    /**
+     * Scans an arbitrary expression subtree for two things at once:
+     * recursive calls to the enclosing function, and any buried
+     * if/while/do-while/for/when/try -- which get handed to [walk] and
+     * scored structurally instead of being invisible to the calculator.
+     * Stops descending at a nested named function or class/object
+     * declaration (a local function, an anonymous object) so that its
+     * own body is never folded into the enclosing function's score --
+     * lambda bodies are NOT a boundary and get scanned right through,
+     * since `list.forEach { if (it > 0) ... } }` is exactly the buried
+     * case this is meant to catch.
+     */
+    private fun scanExpression(expr: KtExpression?, methodName: String): List<ControlNode> {
         if (expr == null) return emptyList()
-        val calls = mutableListOf<ControlNode.RecursiveCall>()
+        val nodes = mutableListOf<ControlNode>()
         expr.accept(object : KtTreeVisitorVoid() {
             override fun visitCallExpression(expression: KtCallExpression) {
                 super.visitCallExpression(expression)
                 val name = (expression.calleeExpression as? KtNameReferenceExpression)?.getReferencedName()
                 if (name == methodName) {
-                    calls.add(ControlNode.RecursiveCall(methodName))
+                    nodes.add(ControlNode.RecursiveCall(methodName))
                 }
             }
+
+            override fun visitIfExpression(expression: KtIfExpression) {
+                nodes.addAll(walk(expression, methodName)) // do not call super: walk() already recurses this subtree
+            }
+
+            override fun visitWhileExpression(expression: KtWhileExpression) {
+                nodes.addAll(walk(expression, methodName))
+            }
+
+            override fun visitDoWhileExpression(expression: KtDoWhileExpression) {
+                nodes.addAll(walk(expression, methodName))
+            }
+
+            override fun visitForExpression(expression: KtForExpression) {
+                nodes.addAll(walk(expression, methodName))
+            }
+
+            override fun visitWhenExpression(expression: KtWhenExpression) {
+                nodes.addAll(walk(expression, methodName))
+            }
+
+            override fun visitTryExpression(expression: KtTryExpression) {
+                nodes.addAll(walk(expression, methodName))
+            }
+
+            override fun visitNamedFunction(function: KtNamedFunction) {
+                // Boundary: a local function's own body is scored separately, never here.
+            }
+
+            override fun visitClassOrObject(classOrObject: KtClassOrObject) {
+                // Boundary: an anonymous object/local class's own methods are scored separately.
+            }
         })
-        return calls
+        return nodes
     }
 
     private fun extractBoolExpr(expr: KtExpression?): BoolExpr? {

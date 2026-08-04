@@ -189,4 +189,70 @@ class KotlinCognitiveWalkerTest : BasePlatformTestCase() {
         )
         assertEquals(4, score)
     }
+
+    fun testIfBuriedInAFunctionArgumentIsScoredStructurally() {
+        // if: 1+0=1 (then empty, calls aren't recursive); else: +1 -> 2
+        val score = scoreOfFunction(
+            """
+            fun target(x: Int) {
+                foo(if (x > 0) a() else b())
+            }
+            fun foo(y: Int) {}
+            fun a() = 1
+            fun b() = 2
+            """.trimIndent(),
+        )
+        assertEquals(2, score)
+    }
+
+    fun testIfBuriedInALambdaBodyIsScoredStructurally() {
+        // if: 1+0=1 (then empty, flag() isn't recursive), no else -> 1
+        val score = scoreOfFunction(
+            """
+            fun target(items: List<Int>) {
+                items.forEach {
+                    if (it > 0) {
+                        flag()
+                    }
+                }
+            }
+            fun flag() {}
+            """.trimIndent(),
+        )
+        assertEquals(1, score)
+    }
+
+    fun testAnAnonymousObjectsOwnMethodDoesNotBleedIntoTheEnclosingFunctionScore() {
+        // the if lives inside Runnable.run(), a separate function -- target() itself is flat -> 0
+        val score = scoreOfFunction(
+            """
+            fun target() {
+                foo(object : Runnable {
+                    override fun run() {
+                        if (condition()) {
+                            flag()
+                        }
+                    }
+                })
+            }
+            fun foo(r: Runnable) {}
+            fun condition() = true
+            fun flag() {}
+            """.trimIndent(),
+        )
+        assertEquals(0, score)
+    }
+
+    fun testRecursiveCallInsideALambdaArgumentIsStillDetected() {
+        // no structural constructs, just the recursive call buried inside a lambda -> 1
+        val score = scoreOfFunction(
+            """
+            fun target(n: Int): Int {
+                return listOf(n).map { count(target(it - 1)) }.first()
+            }
+            fun count(x: Int) = x
+            """.trimIndent(),
+        )
+        assertEquals(1, score)
+    }
 }

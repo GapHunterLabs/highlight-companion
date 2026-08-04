@@ -229,4 +229,61 @@ class JavaCognitiveWalkerTest : BasePlatformTestCase() {
         val method: PsiMethod = psiFile.classes.first().methods.first { it.name == "target" }
         assertEquals(0, CognitiveComplexityCalculator.score(JavaCognitiveWalker.buildBody(method)))
     }
+
+    fun testIfBuriedInALambdaBodyIsScoredStructurally() {
+        // if: 1+0=1 (then empty, flag() isn't recursive), no else -> 1
+        val score = scoreOfMethod(
+            """
+            class Acme {
+                void target(java.util.List<Integer> items) {
+                    items.forEach(x -> {
+                        if (x > 0) {
+                            flag();
+                        }
+                    });
+                }
+                void flag() {}
+            }
+            """.trimIndent(),
+        )
+        assertEquals(1, score)
+    }
+
+    fun testAnAnonymousClasssOwnMethodDoesNotBleedIntoTheEnclosingMethodScore() {
+        // the if lives inside the anonymous Runnable's run(), a separate method -- target() itself is flat -> 0
+        val score = scoreOfMethod(
+            """
+            class Acme {
+                void target() {
+                    foo(new Runnable() {
+                        public void run() {
+                            if (condition()) {
+                                flag();
+                            }
+                        }
+                    });
+                }
+                void foo(Runnable r) {}
+                boolean condition() { return true; }
+                void flag() {}
+            }
+            """.trimIndent(),
+        )
+        assertEquals(0, score)
+    }
+
+    fun testRecursiveCallInsideALambdaArgumentIsStillDetected() {
+        // no structural constructs, just the recursive call buried inside a lambda -> 1
+        val score = scoreOfMethod(
+            """
+            class Acme {
+                int target(int n) {
+                    return apply(x -> target(x - 1), n);
+                }
+                int apply(java.util.function.IntUnaryOperator op, int n) { return op.applyAsInt(n); }
+            }
+            """.trimIndent(),
+        )
+        assertEquals(1, score)
+    }
 }
