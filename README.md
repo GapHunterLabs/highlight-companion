@@ -108,7 +108,7 @@ the green/yellow/red cutoffs.
 ## Enterprise / Team Licensing
 
 Need enterprise features, custom complexity rules, or team licensing?
-Contact us at **kennyj.diazm@gmail.com**.
+Contact us at **gaphunterlabs@gmail.com**.
 
 ## Development
 
