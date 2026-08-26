@@ -33,6 +33,7 @@
             instance="dev.gaphunter.highlightcompanion.settings.HighlightCompanionConfigurable"
             id="dev.gaphunter.highlightcompanion.settings.HighlightCompanionConfigurable"
             displayName="Highlight Companion"/>
+        <notificationGroup id="Highlight Companion" displayType="BALLOON"/>
     </extensions>
 
     <!-- Required since the Kotlin plugin's K2 mode became the default: without this,

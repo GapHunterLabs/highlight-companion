@@ -10,6 +10,7 @@ import com.intellij.ui.JBColor
 import dev.gaphunter.highlightcompanion.complexity.CognitiveComplexityCalculator
 import dev.gaphunter.highlightcompanion.psi.JavaCognitiveWalker
 import dev.gaphunter.highlightcompanion.psi.KotlinCognitiveWalker
+import dev.gaphunter.highlightcompanion.review.ReviewPrompt
 import dev.gaphunter.highlightcompanion.settings.HighlightCompanionSettings
 import org.jetbrains.kotlin.psi.KtNamedFunction
 
@@ -40,6 +41,17 @@ class CognitiveComplexityLineMarkerProvider : LineMarkerProviderDescriptor(), Du
             val score = scoreOf(anchor, config)
             if (score < state.minimumToShow) continue
             result.add(buildMarker(element, score, state))
+
+            // Only the red (genuinely concerning) threshold counts as a
+            // real, actionable finding -- green/yellow markers show up on
+            // ordinary, healthy methods too and would inflate the CTA
+            // counter on code that doesn't actually need attention.
+            if (score >= state.redThreshold) {
+                val file = element.containingFile
+                val path = file.virtualFile?.path ?: continue
+                val lineNumber = file.viewProvider.document?.getLineNumber(element.textRange.startOffset) ?: -1
+                ReviewPrompt.recordHit(file.project, "$path:$lineNumber")
+            }
         }
     }
 

@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+## [0.1.4]
+
+### Added
+
+- Review/star CTA: after 10 distinct methods crossing the red
+  (genuinely concerning) complexity threshold -- never counted for
+  ordinary green/yellow markers, which show up on healthy code too --
+  a one-time notification asks whether to rate the plugin on
+  Marketplace, with a permanent "Don't ask again" option. Standard
+  mechanism used catalog-wide since 2026-08-24 (`CONSTITUTION.md`
+  §7.2), rolled out to this plugin now.
+
 ## [0.1.3]
 
 ### Added
@@ -57,7 +69,8 @@
   cutoff before an icon is shown at all.
 - No telemetry, no license prompts, no network access.
 
-[Unreleased]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.3...HEAD
+[Unreleased]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.4...HEAD
+[0.1.4]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.3...0.1.4
 [0.1.3]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.2...0.1.3
 [0.1.2]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.0...0.1.1
