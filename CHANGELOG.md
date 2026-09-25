@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [0.1.5]
+
+### Fixed
+
+- Review/star CTA now links to this plugin's own Marketplace
+  reviews page instead of the vendor's generic plugin list.
+
 ## [0.1.4]
 
 ### Added
@@ -69,7 +76,8 @@
   cutoff before an icon is shown at all.
 - No telemetry, no license prompts, no network access.
 
-[Unreleased]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.4...HEAD
+[Unreleased]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.5...HEAD
+[0.1.5]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.4...0.1.5
 [0.1.4]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.3...0.1.4
 [0.1.3]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.2...0.1.3
 [0.1.2]: https://github.com/GapHunterLabs/highlight-companion/compare/0.1.1...0.1.2
