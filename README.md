@@ -5,6 +5,12 @@ Kotlin methods/functions — a colored badge with the real number, computed
 with SonarSource's documented Cognitive Complexity algorithm, never blocking
 the UI thread.
 
+![Highlight Companion: A cognitive-complexity badge on every Java and Kotlin method, computed off the UI thread](docs/media/hero.gif)
+
+Each feature on its own:
+[Complexity per method](docs/media/01-complexity-badges.gif) ·
+[Thresholds you control](docs/media/02-thresholds.gif)
+
 ## Why it exists
 
 Born from real, independent, recent (2026-02) evidence in JetBrains
